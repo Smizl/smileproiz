@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+out/
+
+# VS Code
+.vscode/
+
+# Java / Maven / Gradle
+target/
+*.log
+
+# Spring
+*.pid
+
+# Env / secrets
+.env
+*.env
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+build/
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+android/.gradle/
+android/local.properties
+
+# Node (если есть)
+node_modules/
+
+# Docker local volumes (если где-то создаются файлы)
+**/data/

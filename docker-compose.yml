@@ -1,0 +1,53 @@
+version: "3.9"  # указываем версию docker-compose
+
+services:
+  db:
+    image: postgres:16
+    container_name: smileproiz-db
+    environment:
+      POSTGRES_DB: smileproiz
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Maullen08
+    ports:
+      - "5433:5432"
+    volumes:
+      - smileproiz_pgdata:/var/lib/postgresql/data
+    networks:
+      - smileproiz-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smileproiz-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/smileproiz
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: Maullen08
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smileproiz-network
+    command: >
+      sh -c "
+      echo 'Waiting for Postgres...';
+      until pg_isready -h db -p 5432 -U postgres; do
+        sleep 2;
+      done;
+      echo 'Postgres is ready. Starting backend...';
+      java -jar app.jar
+      "
+
+volumes:
+  smileproiz_pgdata:
+
+networks:
+  smileproiz-network:
