@@ -370,13 +370,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
           : product['id'] as int;
 
       // Добавляем через серверный сервис (если есть)
-      final serverItem = await CartService.addToCart(
+      // Добавляем через серверный сервис (если есть)
+      final cartService = CartService();
+      final serverItem = await cartService.addToCart(
         productId: productId,
         quantity: 1,
         selectedSize: size,
         selectedColor: color,
       );
-
       // После успешного ответа сервера обновляем локальный Provider
       await cartProvider.addItem(
         productId: productId,

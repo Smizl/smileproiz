@@ -8,7 +8,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
-public class AdminPasswordReset implements CommandLineRunner {
+public class AllUsersPasswordHasher implements CommandLineRunner {
 
     @Autowired
     private UserRepository userRepository;

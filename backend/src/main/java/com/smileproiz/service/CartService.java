@@ -2,11 +2,14 @@ package com.smileproiz.service;
 
 import com.smileproiz.model.CartItem;
 import com.smileproiz.model.Product;
+import com.smileproiz.model.User;
 import com.smileproiz.repository.CartRepository;
 import com.smileproiz.repository.ProductRepository;
+import com.smileproiz.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -20,47 +23,61 @@ public class CartService {
 
     private final CartRepository cartRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
 
-    public CartService(CartRepository cartRepository, ProductRepository productRepository) {
+    public CartService(CartRepository cartRepository,
+                       ProductRepository productRepository,
+                       UserRepository userRepository) {
         this.cartRepository = cartRepository;
         this.productRepository = productRepository;
+        this.userRepository = userRepository;
     }
 
-    // Получить все товары в корзине
+private User currentUser() {
+    var auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || auth.getPrincipal() == null) {
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+    }
+    String email = auth.getPrincipal().toString().trim().toLowerCase();
+    return userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+}
+
+    // Получить корзину только текущего пользователя
     public List<CartItem> getAllItems() {
-        return cartRepository.findAll();
+        User user = currentUser();
+        return cartRepository.findByUser(user);
     }
 
-    // Добавить товар в корзину (quantity всегда = 1)
     public CartItem addItem(Long productId, String selectedSize, String selectedColor) {
+        User user = currentUser();
 
-        // Приведение к trim() и стандартному регистру
         String size = selectedSize != null ? selectedSize.trim() : "Один размер";
         String color = selectedColor != null ? selectedColor.trim() : "Нет цвета";
 
-        logger.info("Добавляем товар в корзину: productId={}, size={}, color={}",
-                productId, size, color);
+        logger.info("Add to cart: user={}, productId={}, size={}, color={}",
+                user.getEmail(), productId, size, color);
 
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Товар с id " + productId + " не найден"));
 
-        // Проверка наличия на складе
         if (!product.isInStock()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Товар " + product.getName() + " отсутствует на складе");
         }
 
-        // Проверяем, есть ли уже такой товар в корзине
         Optional<CartItem> existingItem = cartRepository
-                .findByProductAndSelectedSizeAndSelectedColor(product, size, color);
+                .findByUserAndProductAndSelectedSizeAndSelectedColor(user, product, size, color);
+
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
             item.setQuantity(item.getQuantity() + 1);
             return cartRepository.save(item);
         }
-        // Создаём новый элемент корзины с quantity = 1
+
         CartItem item = new CartItem();
+        item.setUser(user);
         item.setProduct(product);
         item.setQuantity(1);
         item.setSelectedSize(size);
@@ -70,25 +87,36 @@ public class CartService {
         return cartRepository.save(item);
     }
 
-    // Удалить товар из корзины
     public void removeItem(Long id) {
-        if (!cartRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Товар в корзине с id " + id + " не найден");
+        User user = currentUser();
+
+        CartItem item = cartRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Товар в корзине с id " + id + " не найден"));
+
+        // запрет удалить чужой item
+        if (!item.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к чужой корзине");
         }
-        cartRepository.deleteById(id);
+
+        cartRepository.delete(item);
     }
 
-    // Очистить корзину
     public void clearCart() {
-        cartRepository.deleteAll();
+        User user = currentUser();
+        cartRepository.deleteByUser(user);
     }
 
-    // Обновить количество товара
     public CartItem updateItemQuantity(Long cartItemId, int newQuantity) {
+        User user = currentUser();
+
         CartItem item = cartRepository.findById(cartItemId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Товар в корзине с id " + cartItemId + " не найден"));
+
+        if (!item.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к чужой корзине");
+        }
 
         if (newQuantity <= 0) {
             cartRepository.delete(item);

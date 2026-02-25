@@ -1,21 +1,52 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CartService {
-  static const String baseUrl = 'http://172.20.10.3:8080/api/cart';
-  static const Map<String, String> headers = {
-    'Content-Type': 'application/json',
-  };
+  final http.Client client;
 
-  /// ➕ Добавление товара в корзину
-  static Future<Map<String, dynamic>> addToCart({
+  CartService({http.Client? client}) : client = client ?? http.Client();
+
+  // -----------------------------
+  // Host config
+  // -----------------------------
+  static const String _defaultHost = 'http://172.20.10.3:8080';
+  static const String _hostKey = 'api_host';
+
+  Future<String> _getHost() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_hostKey) ?? _defaultHost;
+  }
+
+  Future<String> _baseUrl() async => '${await _getHost()}/api/cart';
+
+  // -----------------------------
+  // Auth headers
+  // -----------------------------
+  Future<Map<String, String>> _authHeaders({bool json = true}) async {
+    final headers = <String, String>{};
+    if (json) headers['Content-Type'] = 'application/json';
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  // -----------------------------
+  // ➕ Add to cart
+  // -----------------------------
+  Future<Map<String, dynamic>> addToCart({
     required int productId,
     required int quantity,
     String? selectedSize,
     String? selectedColor,
     Duration? timeout,
   }) async {
-    final url = Uri.parse('$baseUrl/add');
+    final url = Uri.parse('${await _baseUrl()}/add');
 
     final size = selectedSize?.isNotEmpty == true
         ? selectedSize!
@@ -31,14 +62,10 @@ class CartService {
       'selectedColor': color,
     });
 
-    print('🟢 Отправка запроса на сервер: $body');
-
     try {
-      final response = await http
-          .post(url, headers: headers, body: body)
+      final response = await client
+          .post(url, headers: await _authHeaders(json: true), body: body)
           .timeout(timeout ?? const Duration(seconds: 10));
-
-      print('🔵 Ответ сервера: ${response.statusCode} ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception(
@@ -46,127 +73,101 @@ class CartService {
         );
       }
 
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      print('✅ Товар успешно добавлен на сервере: $decoded');
-      return decoded;
+      return jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {
-      print('⚠️ Ошибка в addToCart: $e');
       rethrow;
     }
   }
 
-  /// 📦 Получение всех товаров корзины
-  static Future<List<Map<String, dynamic>>> getCartItems({
-    Duration? timeout,
-  }) async {
-    final url = Uri.parse('$baseUrl/all');
+  // -----------------------------
+  // 📦 Get cart items
+  // -----------------------------
+  Future<List<Map<String, dynamic>>> getCartItems({Duration? timeout}) async {
+    final url = Uri.parse('${await _baseUrl()}/all');
 
-    try {
-      final response = await http
-          .get(url, headers: headers)
-          .timeout(timeout ?? const Duration(seconds: 10));
+    final response = await client
+        .get(url, headers: await _authHeaders(json: false))
+        .timeout(timeout ?? const Duration(seconds: 10));
 
-      print('🔵 Ответ getCartItems: ${response.statusCode} ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
-        return data.cast<Map<String, dynamic>>();
-      } else {
-        throw Exception(
-          'Ошибка при получении корзины: ${response.statusCode} ${response.body}',
-        );
-      }
-    } catch (e) {
-      print('⚠️ Ошибка getCartItems: $e');
-      rethrow;
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List<dynamic>;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } else {
+      throw Exception(
+        'Ошибка при получении корзины: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
-  /// ✏️ Обновление количества товара по актуальному id
-  static Future<void> updateCartItem({
+  // -----------------------------
+  // ✏️ Update item
+  // -----------------------------
+  Future<void> updateCartItem({
     required int cartItemId,
     required int newQuantity,
     Duration? timeout,
   }) async {
-    final url = Uri.parse('$baseUrl/update/$cartItemId?quantity=$newQuantity');
+    final url = Uri.parse(
+      '${await _baseUrl()}/update/$cartItemId?quantity=$newQuantity',
+    );
 
-    print('🟢 updateCartItem: id=$cartItemId quantity=$newQuantity');
+    final response = await client
+        .put(url, headers: await _authHeaders(json: false))
+        .timeout(timeout ?? const Duration(seconds: 10));
 
-    try {
-      final response = await http
-          .put(url, headers: headers)
-          .timeout(timeout ?? const Duration(seconds: 10));
-
-      print('🔵 Ответ updateCartItem: ${response.statusCode} ${response.body}');
-
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(
-          'Ошибка при обновлении товара: ${response.statusCode} ${response.body}',
-        );
-      }
-    } catch (e) {
-      print('⚠️ Ошибка updateCartItem: $e');
-      rethrow;
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Ошибка при обновлении товара: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
-  /// ❌ Удаление одного товара по id из сервера
-  static Future<void> deleteCartItem({
+  // -----------------------------
+  // ❌ Delete item
+  // -----------------------------
+  Future<void> deleteCartItem({
     required int cartItemId,
     Duration? timeout,
   }) async {
-    final url = Uri.parse('$baseUrl/delete/$cartItemId');
-    print('🟢 deleteCartItem: id=$cartItemId');
+    final url = Uri.parse('${await _baseUrl()}/delete/$cartItemId');
 
-    try {
-      final response = await http
-          .delete(url, headers: headers)
-          .timeout(timeout ?? const Duration(seconds: 10));
+    final response = await client
+        .delete(url, headers: await _authHeaders(json: false))
+        .timeout(timeout ?? const Duration(seconds: 10));
 
-      print('🔵 Ответ deleteCartItem: ${response.statusCode} ${response.body}');
-
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(
-          'Ошибка при удалении товара: ${response.statusCode} ${response.body}',
-        );
-      }
-    } catch (e) {
-      print('⚠️ Ошибка deleteCartItem: $e');
-      rethrow;
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Ошибка при удалении товара: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
-  /// 🧹 Очистка корзины
-  static Future<void> clearCart({Duration? timeout}) async {
-    final url = Uri.parse('$baseUrl/clear');
-    print('🟢 clearCart');
+  // -----------------------------
+  // 🧹 Clear cart
+  // -----------------------------
+  Future<void> clearCart({Duration? timeout}) async {
+    final url = Uri.parse('${await _baseUrl()}/clear');
 
-    try {
-      final response = await http
-          .delete(url, headers: headers)
-          .timeout(timeout ?? const Duration(seconds: 10));
+    final response = await client
+        .delete(url, headers: await _authHeaders(json: false))
+        .timeout(timeout ?? const Duration(seconds: 10));
 
-      print('🔵 Ответ clearCart: ${response.statusCode} ${response.body}');
-
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(
-          'Ошибка при очистке корзины: ${response.statusCode} ${response.body}',
-        );
-      }
-    } catch (e) {
-      print('⚠️ Ошибка clearCart: $e');
-      rethrow;
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Ошибка при очистке корзины: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
-  /// 🔄 Пример безопасного обновления всех товаров: берем id с сервера
-  static Future<void> incrementAllItems() async {
+  // -----------------------------
+  // 🔄 Increment all
+  // -----------------------------
+  Future<void> incrementAllItems() async {
     final cart = await getCartItems();
     for (var item in cart) {
       final int id = item['id'];
       final int quantity = item['quantity'];
       await updateCartItem(cartItemId: id, newQuantity: quantity + 1);
-      print('✅ Обновлен item id=$id, новое количество=${quantity + 1}');
     }
   }
 }

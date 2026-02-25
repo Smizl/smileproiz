@@ -4,8 +4,29 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://172.20.10.3:8080/api/users';
+  // -----------------------------
+  // ✅ Host config (удобно для раздачи)
+  // -----------------------------
+  static const String _defaultHost = 'http://172.20.10.3:8080';
+  static const String _hostKey = 'api_host';
+
   static const int retryCount = 3;
+
+  // База именно users
+  static String _usersBase(String host) => '$host/api/users';
+
+  /// Поставить хост (например, когда IP поменялся)
+  /// Пример: await ApiService.setHost('http://172.20.10.7:8080');
+  static Future<void> setHost(String host) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_hostKey, host);
+  }
+
+  /// Получить текущий хост
+  static Future<String> getHost() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_hostKey) ?? _defaultHost;
+  }
 
   // -----------------------------
   // Retry helper
@@ -43,14 +64,17 @@ class ApiService {
   Map<String, dynamic> _decodeBody(String body) {
     final decoded = jsonDecode(body);
     if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return Map<String, dynamic>.from(decoded);
     throw Exception('Invalid JSON');
   }
 
+  /// ✅ Безопаснее: data может быть Map или что-то другое
   Map<String, dynamic>? _extractData(Map<String, dynamic> apiResp) {
     final data = apiResp['data'];
     if (data == null) return null;
     if (data is Map<String, dynamic>) return data;
-    return Map<String, dynamic>.from(data);
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return null;
   }
 
   bool _extractSuccess(Map<String, dynamic> apiResp) =>
@@ -134,6 +158,9 @@ class ApiService {
   // PUSH
   // -----------------------------
   Future<void> updatePushToken(int userId, String token) async {
+    final host = await getHost();
+    final baseUrl = _usersBase(host);
+
     final url = Uri.parse('$baseUrl/$userId/push-setting');
     final response = await _retryRequest(
       () async => http.put(
@@ -149,6 +176,9 @@ class ApiService {
   }
 
   Future<void> updatePushSetting(int userId, bool enabled) async {
+    final host = await getHost();
+    final baseUrl = _usersBase(host);
+
     final url = Uri.parse('$baseUrl/$userId/push-setting');
     final response = await _retryRequest(
       () async => http.put(
@@ -167,6 +197,9 @@ class ApiService {
   // GET PROFILE
   // -----------------------------
   Future<Map<String, dynamic>?> getUserProfile() async {
+    final host = await getHost();
+    final baseUrl = _usersBase(host);
+
     final local = await _getLocalUser();
     if (local == null) return null;
 
@@ -180,7 +213,7 @@ class ApiService {
 
     // если токен просрочен/неверный
     if (response.statusCode == 401) {
-      return local; // можно ещё сделать logout(), но оставлю мягко
+      return local; // мягко
     }
 
     final apiResp = _decodeBody(response.body);
@@ -204,6 +237,9 @@ class ApiService {
     String email,
     String password,
   ) async {
+    final host = await getHost();
+    final baseUrl = _usersBase(host);
+
     final response = await _retryRequest(
       () => http.post(
         Uri.parse('$baseUrl/register'),
@@ -234,14 +270,14 @@ class ApiService {
 
     await _saveLocalUser(data);
 
-    // ⚠️ Токен register не возвращает (у нас токен приходит с /login)
     return {'success': true, 'message': msg, 'user': data};
   }
 
-  /// Новый login:
-  /// Backend теперь возвращает:
-  /// data: { token: "...", user: { ... } }
+  /// Backend: data: { token, user }
   Future<Map<String, dynamic>> login(String email, String password) async {
+    final host = await getHost();
+    final baseUrl = _usersBase(host);
+
     final response = await _retryRequest(
       () => http.post(
         Uri.parse('$baseUrl/login'),
@@ -316,6 +352,9 @@ class ApiService {
     int userId,
     Map<String, dynamic> body,
   ) async {
+    final host = await getHost();
+    final baseUrl = _usersBase(host);
+
     final response = await _retryRequest(
       () async => http.put(
         Uri.parse('$baseUrl/$userId'),

@@ -10,7 +10,13 @@ public class CartItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER) // убедимся, что Product подтягивается
+    // ✅ Владелец корзины
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    // ✅ Товар
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
@@ -21,59 +27,38 @@ public class CartItem {
     @Column(nullable = false)
     private Integer price;
 
-    public CartItem() {
-    }
+    public CartItem() {}
 
-    public CartItem(Product product, int quantity, String selectedSize, String selectedColor) {
+    public CartItem(User user, Product product, int quantity, String selectedSize, String selectedColor) {
+        this.user = user;
         this.product = product;
         this.quantity = quantity;
         this.selectedSize = selectedSize != null ? selectedSize : "";
         this.selectedColor = selectedColor != null ? selectedColor : "";
-        this.price = Integer.valueOf(product.getPrice()); // безопасно
+        this.price = product.getPrice();
     }
 
-    // Геттеры и сеттеры
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
 
-    public Product getProduct() {
-        return product;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public void setProduct(Product product) {
-        this.product = product;
-    }
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
 
-    public int getQuantity() {
-        return quantity;
-    }
+    public int getQuantity() { return quantity; }
+    public void setQuantity(int quantity) { this.quantity = quantity; }
 
-    public void setQuantity(int quantity) {
-        this.quantity = quantity;
-    }
-
-    public String getSelectedSize() {
-        return selectedSize;
-    }
-
+    public String getSelectedSize() { return selectedSize; }
     public void setSelectedSize(String selectedSize) {
         this.selectedSize = selectedSize != null ? selectedSize : "";
     }
 
-    public String getSelectedColor() {
-        return selectedColor;
-    }
-
+    public String getSelectedColor() { return selectedColor; }
     public void setSelectedColor(String selectedColor) {
         this.selectedColor = selectedColor != null ? selectedColor : "";
     }
 
-    public Integer getPrice() {
-        return price;
-    }
-
-    public void setPrice(Integer price) {
-        this.price = price;
-    }
+    public Integer getPrice() { return price; }
+    public void setPrice(Integer price) { this.price = price; }
 }

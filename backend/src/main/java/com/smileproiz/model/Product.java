@@ -1,10 +1,9 @@
 package com.smileproiz.model;
 
 import jakarta.persistence.*;
-import java.util.List;
 
 @Entity
-@Table(name = "products") // имя таблицы совпадает с твоей БД
+@Table(name = "products")
 public class Product {
 
     @Id
@@ -14,7 +13,7 @@ public class Product {
     private String name;
     private int price;
 
-    @Column(name = "image_url") // совпадает с колонкой в БД
+    @Column(name = "image_url")
     private String imageUrl;
 
     private String category;
@@ -26,18 +25,16 @@ public class Product {
     @Column(name = "in_stock")
     private boolean inStock;
 
-    // Дополнительные поля, которые есть в БД, но не были в Entity
-    private String size; // например: "S, M, L"
-    private String heights; // например: "170-180, 180-190"
-    private String color; // например: hex-код цвета
-    private String colors; // например: "Черный, Белый"
+    private String size;
+    private String heights;
+    private String color;
+    private String colors;
 
-    public Product() {
-    }
+    public Product() {}
 
     public Product(String name, int price, String imageUrl, String category,
-            String description, String material, String tag, boolean inStock,
-            String size, String heights, String color, String colors) {
+                   String description, String material, String tag, boolean inStock,
+                   String size, String heights, String color, String colors) {
         this.name = name;
         this.price = price;
         this.imageUrl = imageUrl;
@@ -52,108 +49,41 @@ public class Product {
         this.colors = colors;
     }
 
-    // Геттеры и сеттеры
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
 
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    public int getPrice() { return price; }
+    public void setPrice(int price) { this.price = price; }
 
-    public int getPrice() {
-        return price;
-    }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
-    public void setPrice(int price) {
-        this.price = price;
-    }
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
 
-    public String getImageUrl() {
-        return imageUrl;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
+    public String getMaterial() { return material; }
+    public void setMaterial(String material) { this.material = material; }
 
-    public String getCategory() {
-        return category;
-    }
+    public String getTag() { return tag; }
+    public void setTag(String tag) { this.tag = tag; }
 
-    public void setCategory(String category) {
-        this.category = category;
-    }
+    public boolean isInStock() { return inStock; }
+    public void setInStock(boolean inStock) { this.inStock = inStock; }
 
-    public String getDescription() {
-        return description;
-    }
+    public String getSize() { return size; }
+    public void setSize(String size) { this.size = size; }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    public String getHeights() { return heights; }
+    public void setHeights(String heights) { this.heights = heights; }
 
-    public String getMaterial() {
-        return material;
-    }
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
 
-    public void setMaterial(String material) {
-        this.material = material;
-    }
-
-    public String getTag() {
-        return tag;
-    }
-
-    public void setTag(String tag) {
-        this.tag = tag;
-    }
-
-    public boolean isInStock() {
-        return inStock;
-    }
-
-    public void setInStock(boolean inStock) {
-        this.inStock = inStock;
-    }
-
-    public Boolean getInStock() {
-        return inStock;
-    }
-
-    public String getSize() {
-        return size;
-    }
-
-    public void setSize(String size) {
-        this.size = size;
-    }
-
-    public String getHeights() {
-        return heights;
-    }
-
-    public void setHeights(String heights) {
-        this.heights = heights;
-    }
-
-    public String getColor() {
-        return color;
-    }
-
-    public void setColor(String color) {
-        this.color = color;
-    }
-
-    public String getColors() {
-        return colors;
-    }
-
-    public void setColors(String colors) {
-        this.colors = colors;
-    }
+    public String getColors() { return colors; }
+    public void setColors(String colors) { this.colors = colors; }
 }

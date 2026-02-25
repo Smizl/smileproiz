@@ -35,15 +35,11 @@ public class UserController {
     }
 
     // ✅ Регистрация
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserResponseDto>> register(@RequestBody User user) {
-        try {
-            User savedUser = userService.registerUser(user);
-            return ResponseEntity.ok(new ApiResponse<>(true, "Регистрация успешна ✅", toDto(savedUser)));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponse<>(false, e.getMessage(), null));
-        }
-    }
+ @PostMapping("/register")
+public ApiResponse<UserResponseDto> register(@RequestBody User user) {
+    User savedUser = userService.registerUser(user);
+    return new ApiResponse<>(true, "Регистрация успешна ✅", toDto(savedUser));
+}
 
     // ✅ Логин -> token + user
     @PostMapping("/login")
