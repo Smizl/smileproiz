@@ -4,7 +4,9 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -15,22 +17,33 @@ import java.util.Map;
 @Service
 public class JwtService {
 
-    // ⚠️ Лучше вынести в application.properties, но так тоже ок для старта.
-    // Для HS256 ключ должен быть достаточно длинным (32+ байта).
-    private static final String SECRET =
-            "SMILEPROIZ_SUPER_SECRET_KEY_CHANGE_ME_32+_CHARS_LONG";
+    @Value("${app.jwt.secret}")
+    private String secret;
 
-    private static final long EXP_MS = 1000L * 60 * 60 * 24 * 7; // 7 дней
+    @Value("${app.jwt.exp-ms:604800000}")
+    private long expMs;
 
     private Key key() {
-        return Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String s = (secret == null) ? "" : secret.trim();
+
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(s);
+        } catch (IllegalArgumentException e) {
+            keyBytes = s.getBytes(StandardCharsets.UTF_8);
+        }
+
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret is too short. Need at least 32 bytes for HS256.");
+        }
+
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(String email, String role) {
         Date now = new Date();
-        Date exp = new Date(now.getTime() + EXP_MS);
+        Date exp = new Date(now.getTime() + expMs);
 
-        // Нормализуем роль
         String safeRole = (role == null || role.isBlank()) ? "user" : role.toLowerCase();
 
         return Jwts.builder()
@@ -53,7 +66,7 @@ public class JwtService {
 
     public boolean isTokenValid(String token) {
         try {
-            parseClaims(token); // проверит подпись + exp
+            parseClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;

@@ -47,3 +47,8 @@ jobs:
 
       - name: Build Docker image
         run: docker compose build backend
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco

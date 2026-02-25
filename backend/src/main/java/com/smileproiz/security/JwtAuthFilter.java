@@ -1,5 +1,7 @@
 package com.smileproiz.security;
 
+import com.smileproiz.repository.UserRepository;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,30 +21,28 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, UserRepository userRepository) {
         this.jwtService = jwtService;
+        this.userRepository = userRepository;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path.equals("/api/users/login")
-                || path.equals("/api/users/register")
-                || path.equals("/api/users/test")
+        return path.startsWith("/api/users/login")
+                || path.startsWith("/api/users/register")
+                || path.startsWith("/api/users/test")
                 || path.startsWith("/ws/");
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
         String auth = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // нет токена -> просто пропускаем дальше
         if (auth == null || !auth.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -50,31 +50,29 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String token = auth.substring(7);
 
-        // токен есть, но невалидный -> сразу 401
         if (!jwtService.isTokenValid(token)) {
+            SecurityContextHolder.clearContext();
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
 
-        // если уже аутентифицирован — не трогаем
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             String email = jwtService.extractEmail(token);
-            String role = jwtService.extractRole(token);
 
-            if (role == null || role.isBlank()) role = "user";
+            var userOpt = userRepository.findByEmail(email);
+            if (userOpt.isEmpty()) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
 
-            var authorities = List.of(
-                    new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())
-            );
+        String role = userOpt.get().getRole();
+        if (role == null || role.isBlank()) role = "USER";
 
-            var authToken = new UsernamePasswordAuthenticationToken(
-                    email, // principal
-                    null,
-                    authorities
-            );
+            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
 
+            var authToken = new UsernamePasswordAuthenticationToken(email, null, authorities);
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }
 
